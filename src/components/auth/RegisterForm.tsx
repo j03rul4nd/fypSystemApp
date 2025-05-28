@@ -2,14 +2,14 @@
 "use client";
 
 import { useActionState } from "react";
-import { useFormStatus } from "react-dom"; // Changed from "react"
+import { useFormStatus } from "react-dom";
 import { signUpWithEmailAndPassword } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import Link from "next/link";
-import { AlertCircle, UserPlus } from "lucide-react";
+import { AlertCircle, UserPlus, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 function SubmitButton() {
@@ -23,8 +23,29 @@ function SubmitButton() {
 }
 
 export function RegisterForm() {
-  const initialState = { message: null, errors: {} };
+  const initialState = { message: null, errors: {}, type: "" as const };
   const [state, dispatch] = useActionState(signUpWithEmailAndPassword, initialState);
+
+  if (state.type === "confirmation_pending" && state.message) {
+    return (
+      <Card className="w-full max-w-md shadow-xl">
+        <CardHeader className="text-center">
+          <CardTitle className="text-3xl font-bold text-primary">ChirpSpark</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-6">
+          <Alert variant="default" className="border-green-500/50 bg-green-500/10 text-foreground">
+            <CheckCircle2 className="h-5 w-5 text-green-600" />
+            <AlertDescription className="font-medium text-base">
+              {state.message}
+            </AlertDescription>
+          </Alert>
+          <Button variant="link" asChild className="w-full text-primary text-sm pt-2">
+            <Link href="/login">Proceed to Sign In page</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-full max-w-md shadow-xl">
@@ -59,7 +80,8 @@ export function RegisterForm() {
             )}
           </div>
           
-          {state.message && (typeof state.message === 'string' && !state.errors?.username && !state.errors?.email && !state.errors?.password) && (
+          {/* Display general errors from the action that are not field-specific */}
+          {state.type === "error" && state.message && !state.errors?.username && !state.errors?.email && !state.errors?.password && (
              <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>{state.message}</AlertDescription>

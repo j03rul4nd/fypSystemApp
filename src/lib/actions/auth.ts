@@ -26,6 +26,7 @@ export async function signUpWithEmailAndPassword(prevState: any, formData: FormD
     return {
       message: "Invalid form data.",
       errors: validatedFields.error.flatten().fieldErrors,
+      type: "error" as const,
     };
   }
 
@@ -40,10 +41,14 @@ export async function signUpWithEmailAndPassword(prevState: any, formData: FormD
 
   if (usernameCheckError && usernameCheckError.code !== 'PGRST116') { // PGRST116: no rows found
     console.error("Error checking username:", usernameCheckError);
-    return { message: "Server error checking username. Please try again." };
+    return { message: "Server error checking username. Please try again.", type: "error" as const };
   }
   if (existingUserByUsername) {
-    return { message: "Username is already taken." };
+    return { 
+        message: "Validation failed.", // Generic message, specific error below field
+        errors: { username: ["Username is already taken."] },
+        type: "error" as const 
+    };
   }
   
   // Sign up the user
@@ -52,22 +57,23 @@ export async function signUpWithEmailAndPassword(prevState: any, formData: FormD
     password,
     options: {
       data: {
-        username: username, // This will be available in the session, but not directly in users table yet
+        username: username, 
       },
+      // emailRedirectTo can be configured in Supabase project settings under Auth > URL Configuration
+      // It defaults to Site URL + /auth/callback
     },
   });
 
   if (signUpError) {
     console.error("Sign up error:", signUpError);
-    return { message: signUpError.message || "Could not sign up. Please try again." };
+    return { message: signUpError.message || "Could not sign up. Please try again.", type: "error" as const };
   }
 
   if (!signUpData.user) {
-    return { message: "Could not sign up. Please try again." };
+    return { message: "Could not sign up. User data not returned. Please try again.", type: "error" as const };
   }
 
-  // Create profile in users table using admin client to bypass RLS for initial creation
-  // This is often handled by a database trigger on auth.users table inserts
+  // Create profile in users table using admin client
   const supabaseAdmin = createSupabaseServerAdminClient();
   const { error: profileError } = await supabaseAdmin
     .from('users')
@@ -75,18 +81,30 @@ export async function signUpWithEmailAndPassword(prevState: any, formData: FormD
       id: signUpData.user.id,
       email: email,
       username: username,
-      // avatar_url and bio can be set later by the user
     });
 
   if (profileError) {
     console.error("Error creating profile:", profileError);
     // Potentially delete the auth user if profile creation fails to keep things consistent
     // await supabaseAdmin.auth.admin.deleteUser(signUpData.user.id);
-    return { message: "Could not create user profile. Please contact support." };
+    return { message: "User registered but could not create user profile. Please contact support.", type: "error" as const };
   }
   
-  revalidatePath("/", "layout"); // Revalidate all paths
-  redirect("/fyp"); // Redirect after successful sign up
+  // Check if email confirmation is required
+  // signUpData.session will be null if confirmation is pending.
+  // signUpData.user.email_confirmed_at would also be null/false at this stage.
+  if (signUpData.user && !signUpData.session) {
+     // Email confirmation is pending
+    return {
+        message: "Registration successful! Please check your email to confirm your account. You will be able to log in after confirming.",
+        type: "confirmation_pending" as const,
+        errors: {}, // Ensure errors object is present
+    };
+  }
+
+  // If session exists, user is confirmed (e.g. auto-confirm is ON in Supabase settings or email was already confirmed)
+  revalidatePath("/", "layout"); 
+  redirect("/fyp"); 
 }
 
 
@@ -98,6 +116,7 @@ export async function signInWithEmailAndPassword(prevState: any, formData: FormD
     return {
       message: "Invalid form data.",
       errors: validatedFields.error.flatten().fieldErrors,
+      type: "error" as const,
     };
   }
 
@@ -110,7 +129,7 @@ export async function signInWithEmailAndPassword(prevState: any, formData: FormD
 
   if (error) {
     console.error("Sign in error:", error);
-    return { message: error.message || "Could not sign in. Please check your credentials." };
+    return { message: error.message || "Could not sign in. Please check your credentials.", type: "error" as const };
   }
 
   revalidatePath("/", "layout");
