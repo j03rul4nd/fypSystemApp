@@ -9,6 +9,7 @@ import { useInView } from "react-intersection-observer";
 import { Loader2, SearchX } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
 
 const POSTS_PER_PAGE = 10;
 
