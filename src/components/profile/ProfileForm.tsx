@@ -1,7 +1,8 @@
 
 "use client";
 
-import { useFormState, useFormStatus } from "react-dom";
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom"; // Changed from "react"
 import { updateUserProfile } from "@/lib/actions/users";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,7 +37,7 @@ export function ProfileForm({ profile, onSave, onCancel }: ProfileFormProps) {
   const initialState = { message: null, errors: {}, type: "" as const };
   // Bind profile.id to the action
   const updateUserProfileActionWithId = updateUserProfile.bind(null, profile.id);
-  const [state, dispatch] = useFormState(updateUserProfileActionWithId, initialState);
+  const [state, dispatch] = useActionState(updateUserProfileActionWithId, initialState);
 
   useEffect(() => {
     if (state.type === "success" && state.message) {
@@ -116,4 +117,3 @@ export function ProfileForm({ profile, onSave, onCancel }: ProfileFormProps) {
     </div>
   );
 }
-

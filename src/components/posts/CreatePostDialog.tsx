@@ -2,7 +2,8 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom"; // Changed from "react"
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -51,7 +52,7 @@ export function CreatePostDialog({ trigger }: CreatePostDialogProps) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const initialState = { message: null, errors: {}, type: "" as const, post: null };
-  const [state, dispatch] = useFormState(createPostAction, initialState);
+  const [state, dispatch] = useActionState(createPostAction, initialState);
   const [content, setContent] = useState("");
 
   const getInitials = (name?: string | null) => {
@@ -60,9 +61,9 @@ export function CreatePostDialog({ trigger }: CreatePostDialogProps) {
   }
 
   const handleSubmit = async (formData: FormData) => {
-    dispatch(formData);
-    // Keep content in textarea if error, clear if success
-    const result = await createPostAction(initialState, formData); // Re-evaluate for CDATA
+    // dispatch is called by the form's action prop
+    // We need to observe the state returned by useActionState to react to the action's result
+    const result = await createPostAction(initialState, formData); 
      if (result.type === "success") {
       toast({
         title: "Chirp Sent!",
@@ -70,13 +71,15 @@ export function CreatePostDialog({ trigger }: CreatePostDialogProps) {
       });
       setContent(""); // Clear content on success
       setOpen(false);
-    } else if (result.message) {
+    } else if (result.message && result.type === "error") { // Check for type error as well
        toast({
         title: "Error",
         description: result.message,
         variant: "destructive",
       });
     }
+    // Note: The state from useActionState will also update, which can be used to show errors directly in the form.
+    // The `result` here is from a direct call, `state` is from the hook.
   };
 
 

@@ -1,7 +1,8 @@
 
 "use client";
 
-import { useFormState, useFormStatus } from "react-dom";
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom"; // Changed from "react"
 import { signUpWithEmailAndPassword } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +24,7 @@ function SubmitButton() {
 
 export function RegisterForm() {
   const initialState = { message: null, errors: {} };
-  const [state, dispatch] = useFormState(signUpWithEmailAndPassword, initialState);
+  const [state, dispatch] = useActionState(signUpWithEmailAndPassword, initialState);
 
   return (
     <Card className="w-full max-w-md shadow-xl">
