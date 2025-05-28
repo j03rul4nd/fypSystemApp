@@ -18,7 +18,7 @@ export type Database = {
           bio: string | null
           avatar_url: string | null
           created_at: string
-          is_admin: boolean | null // Added is_admin
+          is_admin: boolean | null
         }
         Insert: {
           id: string
@@ -27,7 +27,7 @@ export type Database = {
           bio?: string | null
           avatar_url?: string | null
           created_at?: string
-          is_admin?: boolean | null // Added is_admin
+          is_admin?: boolean | null
         }
         Update: {
           id?: string
@@ -36,7 +36,7 @@ export type Database = {
           bio?: string | null
           avatar_url?: string | null
           created_at?: string
-          is_admin?: boolean | null // Added is_admin
+          is_admin?: boolean | null
         }
         Relationships: [
           {
@@ -197,6 +197,9 @@ export type UserProfile = Profile & {
 };
 
 export type UserAlgorithmInsight = Profile & {
+  posts_count: number;
+  followers_count: number;
+  following_count: number;
   likedPostsCount: number;
   derivedTopics: string[];
   fypStrategy: string;
