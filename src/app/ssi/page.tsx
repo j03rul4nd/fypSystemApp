@@ -7,8 +7,9 @@ import type { UserAlgorithmInsight } from '@/lib/types/supabase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, ShieldCheck, CalendarDays, MessageSquare, Users, UserPlus } from 'lucide-react';
+import { AlertTriangle, ShieldCheck, CalendarDays, MessageSquare, Users, UserPlus, BarChart3 } from 'lucide-react';
 import { format } from 'date-fns';
+import { SystemOverview } from '@/components/ssi/SystemOverview'; // Import the new component
 
 async function getAlgorithmInsightsData(): Promise<UserAlgorithmInsight[]> {
   const supabase = createSupabaseServerClient();
@@ -63,7 +64,7 @@ async function getAlgorithmInsightsData(): Promise<UserAlgorithmInsight[]> {
         .map(postId => postsMap.get(postId) || [])
         .filter(topics => topics && topics.length > 0);
 
-    const uniqueLikedTopics: string[] = [...new Set(likedTopicsArrays.flat().filter(topic => topic))];
+    const uniqueLikedTopics: string[] = [...new Set(likedTopicsArrays.flat().filter(topic => topic && typeof topic === 'string' && topic.trim() !== ''))];
     
     const typedUser = user as any; // To safely access count arrays
 
@@ -73,7 +74,7 @@ async function getAlgorithmInsightsData(): Promise<UserAlgorithmInsight[]> {
       email: user.email,
       is_admin: user.is_admin,
       created_at: user.created_at,
-      bio: null, // bio and avatar_url are not selected, so set to null or default
+      bio: null, 
       avatar_url: null,
       posts_count: typedUser.posts_count?.[0]?.count ?? 0,
       followers_count: typedUser.followers_count?.[0]?.count ?? 0,
@@ -146,21 +147,25 @@ export default async function SSIPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8"> {/* Increased spacing for sections */}
+      {/* System Overview Section */}
+      <SystemOverview />
+
+      {/* User Specific Insights Section */}
       <Card className="shadow-xl">
         <CardHeader>
-          <CardTitle className="text-3xl font-bold flex items-center">
-            <ShieldCheck className="mr-3 h-8 w-8 text-primary" />
-            User Algorithm Insights
+          <CardTitle className="text-2xl font-semibold flex items-center"> {/* Adjusted font and size slightly */}
+            <BarChart3 className="mr-3 h-7 w-7 text-primary" /> {/* Changed icon */}
+            User-Specific Algorithm Insights
           </CardTitle>
           <CardDescription>
-            Overview of user interactions and potential FYP algorithm inputs.
+            Detailed view of individual user interactions and derived FYP algorithm inputs.
             Logged in as Admin: <span className="font-semibold">{profile.username}</span>
           </CardDescription>
         </CardHeader>
         <CardContent>
           {fetchError && (
-            <div className="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg" role="alert">
+            <div className="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg dark:bg-red-900/30 dark:text-red-300" role="alert">
               <span className="font-medium">Error:</span> {fetchError}
             </div>
           )}
@@ -168,16 +173,16 @@ export default async function SSIPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Email</TableHead>
+                  <TableHead className="whitespace-nowrap">Username</TableHead>
+                  <TableHead className="whitespace-nowrap">Email</TableHead>
                   <TableHead className="text-center whitespace-nowrap"><CalendarDays className="inline-block mr-1 h-4 w-4" />Joined</TableHead>
                   <TableHead className="text-center whitespace-nowrap"><MessageSquare className="inline-block mr-1 h-4 w-4" />Posts</TableHead>
                   <TableHead className="text-center whitespace-nowrap"><Users className="inline-block mr-1 h-4 w-4" />Followers</TableHead>
                   <TableHead className="text-center whitespace-nowrap"><UserPlus className="inline-block mr-1 h-4 w-4" />Following</TableHead>
                   <TableHead className="text-center">Admin?</TableHead>
                   <TableHead className="text-center">Liked Posts</TableHead>
-                  <TableHead>Derived Topics</TableHead>
-                  <TableHead>Potential FYP Strategy</TableHead>
+                  <TableHead>Derived Topics (from Likes)</TableHead>
+                  <TableHead className="whitespace-nowrap">Potential FYP Strategy</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -189,33 +194,35 @@ export default async function SSIPage() {
                   </TableRow>
                 ) : (
                   insightsData.map((insightUser) => (
-                    <TableRow key={insightUser.id}>
+                    <TableRow key={insightUser.id} className="hover:bg-muted/50 transition-colors">
                       <TableCell className="font-medium whitespace-nowrap">{insightUser.username || 'N/A'}</TableCell>
-                      <TableCell className="whitespace-nowrap">{insightUser.email || 'N/A'}</TableCell>
-                      <TableCell className="text-center whitespace-nowrap">{format(new Date(insightUser.created_at), "MMM d, yyyy")}</TableCell>
-                      <TableCell className="text-center">{insightUser.posts_count}</TableCell>
-                      <TableCell className="text-center">{insightUser.followers_count}</TableCell>
-                      <TableCell className="text-center">{insightUser.following_count}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{insightUser.email || 'N/A'}</TableCell>
+                      <TableCell className="text-center whitespace-nowrap text-sm">{format(new Date(insightUser.created_at), "MMM d, yyyy")}</TableCell>
+                      <TableCell className="text-center font-medium">{insightUser.posts_count}</TableCell>
+                      <TableCell className="text-center font-medium">{insightUser.followers_count}</TableCell>
+                      <TableCell className="text-center font-medium">{insightUser.following_count}</TableCell>
                       <TableCell className="text-center">
                         {insightUser.is_admin ? (
-                          <Badge variant="default" className="bg-green-500 hover:bg-green-600 text-white">Yes</Badge>
+                          <Badge variant="default" className="bg-green-500 hover:bg-green-600 text-white text-xs px-2 py-0.5">Yes</Badge>
                         ) : (
-                          <Badge variant="secondary">No</Badge>
+                          <Badge variant="secondary" className="text-xs px-2 py-0.5">No</Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-center">{insightUser.likedPostsCount}</TableCell>
+                      <TableCell className="text-center font-medium">{insightUser.likedPostsCount}</TableCell>
                       <TableCell>
                         {insightUser.derivedTopics.length > 0 ? (
                           <div className="flex flex-wrap gap-1 max-w-xs">
                             {insightUser.derivedTopics.map(topic => (
-                              <Badge key={topic} variant="outline" className="text-xs">{topic}</Badge>
+                              <Badge key={topic} variant="outline" className="text-xs px-1.5 py-0.5 bg-primary/10 border-primary/30 text-primary-foreground"> {/* Adjusted badge style */}
+                                {topic}
+                              </Badge>
                             ))}
                           </div>
                         ) : (
-                          <span className="text-xs text-muted-foreground">None</span>
+                          <span className="text-xs text-muted-foreground italic">None</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-xs whitespace-nowrap">{insightUser.fypStrategy}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{insightUser.fypStrategy}</TableCell>
                     </TableRow>
                   ))
                 )}
@@ -227,3 +234,4 @@ export default async function SSIPage() {
     </div>
   );
 }
+
