@@ -18,6 +18,7 @@ export type Database = {
           bio: string | null
           avatar_url: string | null
           created_at: string
+          is_admin: boolean | null // Added is_admin
         }
         Insert: {
           id: string
@@ -26,6 +27,7 @@ export type Database = {
           bio?: string | null
           avatar_url?: string | null
           created_at?: string
+          is_admin?: boolean | null // Added is_admin
         }
         Update: {
           id?: string
@@ -34,6 +36,7 @@ export type Database = {
           bio?: string | null
           avatar_url?: string | null
           created_at?: string
+          is_admin?: boolean | null // Added is_admin
         }
         Relationships: [
           {
@@ -54,7 +57,7 @@ export type Database = {
           topics: string[] | null
           sentiment: string | null
           tone: string | null
-          retention_rate: number | null // Simplified, actual calculation might be complex
+          retention_rate: number | null
         }
         Insert: {
           id?: string
@@ -181,9 +184,9 @@ export type Follow = Database['public']['Tables']['follows']['Row'];
 
 // For enriched post data, e.g. with author profile and like count
 export type PostWithAuthor = Post & {
-  users: Profile | null; // Supabase often returns related table as object with table name
-  likes: { count: number }[]; // Assuming a join with count
-  liked_by_user?: boolean; // To indicate if current user liked this post
+  users: Profile | null; 
+  likes: { count: number }[]; 
+  liked_by_user?: boolean; 
 };
 
 export type UserProfile = Profile & {
@@ -193,3 +196,8 @@ export type UserProfile = Profile & {
   is_followed_by_current_user?: boolean;
 };
 
+export type UserAlgorithmInsight = Profile & {
+  likedPostsCount: number;
+  derivedTopics: string[];
+  fypStrategy: string;
+};
