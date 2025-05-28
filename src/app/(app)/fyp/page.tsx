@@ -26,11 +26,55 @@ export default function FYPPage() {
   const fetchPosts = useCallback(async (currentPage: number) => {
     if (loading || !hasMore) return;
     setLoading(true);
+    console.log(`[FYP Fetch Triggered] User: ${user?.id || 'Guest'}, Page: ${currentPage}, InitialLoading: ${initialLoading}`);
 
     const from = currentPage * POSTS_PER_PAGE;
     const to = from + POSTS_PER_PAGE - 1;
     
-    const { data, error } = await supabase
+    let userLikedTopics: string[] = [];
+    if (user) {
+      console.log(`[FYP Algorithm Insight for user: ${user.id}]`);
+      try {
+        const { data: likedPostIdsData, error: likedPostIdsError } = await supabase
+          .from('likes')
+          .select('post_id')
+          .eq('user_id', user.id);
+
+        if (likedPostIdsError) {
+          console.error("[FYP Algorithm] Error fetching liked post IDs:", likedPostIdsError);
+        } else if (likedPostIdsData && likedPostIdsData.length > 0) {
+          const postIds = likedPostIdsData.map(l => l.post_id);
+          const { data: likedPostsData, error: likedPostsError } = await supabase
+            .from('posts')
+            .select('topics')
+            .in('id', postIds)
+            .not('topics', 'is', null); // Only consider posts that have topics
+
+          if (likedPostsError) {
+            console.error("[FYP Algorithm] Error fetching topics from liked posts:", likedPostsError);
+          } else if (likedPostsData && likedPostsData.length > 0) {
+            userLikedTopics = [...new Set(likedPostsData.flatMap(p => p.topics || []).filter(t => t))];
+            if (userLikedTopics.length > 0) {
+              console.log(` - User has liked posts with topics: ${userLikedTopics.join(', ')}`);
+              console.log(" - FYP Strategy Idea: Prioritize posts with these topics. (Current query shows recent, excluding own posts)");
+            } else {
+              console.log(" - User has liked posts, but those posts have no topics or topics are null/empty.");
+              console.log(" - FYP Strategy Idea: Fallback to general recency. (Current behavior)");
+            }
+          }
+        } else {
+          console.log(" - User has no liked posts yet or no posts with topics were liked.");
+          console.log(" - FYP Strategy: Show diverse recent posts, excluding own. (Current behavior)");
+        }
+      } catch (e) {
+        console.error("[FYP Algorithm] Exception while fetching user interests:", e);
+      }
+    } else {
+      console.log("[FYP Algorithm Insight for Guest User]");
+      console.log(" - FYP Strategy: Show diverse recent posts. (Current behavior)");
+    }
+
+    let query = supabase
       .from('posts')
       .select(`
         id, content, created_at, topics, sentiment, tone, user_id,
@@ -40,10 +84,23 @@ export default function FYPPage() {
       .order('created_at', { ascending: false })
       .range(from, to);
 
+    if (user) {
+      query = query.not('user_id', 'eq', user.id); // Exclude user's own posts
+      console.log(`[FYP Query] Fetching posts for user ${user.id} (excluding own), page: ${currentPage}`);
+    } else {
+      console.log(`[FYP Query] Fetching posts for guest, page: ${currentPage}`);
+    }
+    
+    // TODO: If userLikedTopics.length > 0, could modify 'query' here to use topics.
+    // For now, the query remains recency-based but excludes own posts.
+
+    const { data, error } = await query;
+
     if (error && error.message) {
       console.error("Error fetching posts on FYP:", error.message, error);
       setHasMore(false);
     } else if (data) {
+      console.log(`[FYP Result] Fetched ${data.length} posts. HasMore will be: ${data.length === POSTS_PER_PAGE}`);
       const enrichedPosts = data.map(p => ({
         ...p,
         likes: { count: p.likes.length }, 
@@ -54,38 +111,42 @@ export default function FYPPage() {
       setHasMore(data.length === POSTS_PER_PAGE);
       setPage(currentPage + 1);
     } else {
-      console.warn("No data returned and no standard error message for FYP posts. Error object:", error);
+      console.warn("No data returned for FYP posts, and no standard error. Error object:", error);
+      console.log("[FYP Result] No posts fetched. HasMore will be false.");
       setHasMore(false);
     }
     setLoading(false);
     if (currentPage === 0) setInitialLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabase, user, loading, hasMore]);
+  }, [supabase, user, loading, hasMore, initialLoading /* Added initialLoading here to re-evaluate if it changes outside */]);
 
 
   useEffect(() => {
-    if (user) { 
-        setInitialLoading(true);
+    // Reset and fetch for new user or when user logs out and logs back in
+    // Or if initialLoading was somehow reset externally
+    console.log(`[FYP useEffect user changed or initialLoading changed] User: ${user?.id}, InitialLoading: ${initialLoading}`);
+    if (initialLoading || (user && posts.length === 0 && page === 0)) { // Simpler condition to trigger initial fetch
         setPosts([]); 
         setPage(0);
         setHasMore(true);
-        fetchPosts(0);
-    } else if (!user && !initialLoading) { // If user logs out, reset
-        setInitialLoading(true); // To show skeleton briefly or reset state
+        fetchPosts(0); // Fetch for page 0
+    } else if (!user && !initialLoading) { // User logged out
+        setInitialLoading(true); 
         setPosts([]);
         setPage(0);
-        setHasMore(true); // Allow re-fetch if user logs back in
+        setHasMore(true); 
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]); 
+  }, [user, initialLoading]); // Depend on user and initialLoading
 
 
   useEffect(() => {
-    if (inView && hasMore && !loading && !initialLoading && user) { // Ensure user is present
+    if (inView && hasMore && !loading && !initialLoading) { 
+      console.log(`[FYP useEffect inView] Fetching next page: ${page}`);
       fetchPosts(page);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inView, hasMore, loading, page, initialLoading, user]);
+  }, [inView, hasMore, loading, page, initialLoading]); // Removed 'user' here as it's handled by the above useEffect
 
   const handlePostDeleted = (deletedPostId: string) => {
     setPosts(prevPosts => prevPosts.filter(post => post.id !== deletedPostId));
@@ -133,17 +194,16 @@ export default function FYPPage() {
           ))}
         </div>
       )}
-      {loading && posts.length > 0 && ( // Show loader only if loading more, not initial
+      {loading && posts.length > 0 && ( 
         <div className="flex justify-center items-center py-8">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       )}
       {hasMore && <div ref={ref} className="h-10" />} 
       {!hasMore && posts.length > 0 && (
-        <p className="text-center text-muted-foreground py-8">You&apos;ve reached the end!</p>
+        <p className="text-center text-muted-foreground py-8">You&apos;ve reached the end of your personalized feed for now!</p>
       )}
     </div>
   );
 }
-
     
