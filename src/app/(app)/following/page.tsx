@@ -32,20 +32,19 @@ export default function FollowingPage() {
     const from = currentPage * POSTS_PER_PAGE;
     const to = from + POSTS_PER_PAGE - 1;
 
-    // Get IDs of users the current user follows
     const { data: followedUsers, error: followError } = await supabase
       .from("follows")
       .select("followed_id")
       .eq("follower_id", user.id);
 
-    if (followError) {
-      console.error("Error fetching followed users:", followError);
+    if (followError && followError.message) {
+      console.error("Error fetching followed users:", followError.message, followError);
       setHasMore(false);
       setLoading(false);
       if (currentPage === 0) setInitialLoading(false);
       return;
     }
-
+    
     if (!followedUsers || followedUsers.length === 0) {
       setPosts([]);
       setHasMore(false);
@@ -56,7 +55,7 @@ export default function FollowingPage() {
 
     const followedUserIds = followedUsers.map(f => f.followed_id);
 
-    const { data, error } = await supabase
+    const { data, error: postsError } = await supabase
       .from('posts')
       .select(`
         id, content, created_at, topics, sentiment, tone, user_id,
@@ -67,8 +66,8 @@ export default function FollowingPage() {
       .order('created_at', { ascending: false })
       .range(from, to);
 
-    if (error) {
-      console.error("Error fetching posts:", error);
+    if (postsError && postsError.message) {
+      console.error("Error fetching posts for following feed:", postsError.message, postsError);
       setHasMore(false);
     } else if (data) {
       const enrichedPosts = data.map(p => ({
@@ -80,6 +79,9 @@ export default function FollowingPage() {
       setPosts((prevPosts) => currentPage === 0 ? enrichedPosts : [...prevPosts, ...enrichedPosts]);
       setHasMore(data.length === POSTS_PER_PAGE);
       setPage(currentPage + 1);
+    } else {
+       console.warn("No data returned and no standard error message for following feed posts. Error object:", postsError);
+       setHasMore(false);
     }
     setLoading(false);
     if (currentPage === 0) setInitialLoading(false);
@@ -95,7 +97,10 @@ export default function FollowingPage() {
         setHasMore(true);
         fetchFollowingPosts(0);
     } else {
-        setInitialLoading(false); // If no user, stop initial loading
+        setInitialLoading(false); 
+        setPosts([]); // Clear posts if user logs out
+        setPage(0);
+        setHasMore(true); // Reset for potential new login
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
@@ -160,7 +165,7 @@ export default function FollowingPage() {
           ))}
         </div>
       )}
-      {loading && (
+      {loading && posts.length > 0 && ( // Show loader only if loading more, not initial
         <div className="flex justify-center items-center py-8">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
@@ -172,3 +177,6 @@ export default function FollowingPage() {
     </div>
   );
 }
+
+
+    

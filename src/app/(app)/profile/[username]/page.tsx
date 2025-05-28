@@ -51,12 +51,12 @@ export default function UserProfilePage() {
 
     if (profileError || !profileData) {
       console.error("Error fetching profile:", profileError);
-      setProfile(null); // Or redirect to a 404 page
-      router.push('/404'); // Simple redirect for now
+      setProfile(null);
+      router.push('/404'); 
       return;
     }
     
-    const typedProfileData = profileData as any; // Supabase types for counts can be tricky
+    const typedProfileData = profileData as any; 
     const fetchedProfile: UserProfileType = {
         ...profileData,
         followers_count: typedProfileData.followers_count?.[0]?.count ?? 0,
@@ -78,11 +78,10 @@ export default function UserProfilePage() {
     }
 
     setLoadingProfile(false);
-    // Reset posts when profile changes
     setPosts([]);
     setPostsPage(0);
     setHasMorePosts(true);
-    fetchUserPosts(fetchedProfile.id, 0); // Fetch initial posts for this profile
+    fetchUserPosts(fetchedProfile.id, 0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [username, supabase, currentUser, router]);
 
@@ -97,26 +96,30 @@ export default function UserProfilePage() {
       .from('posts')
       .select(`
         id, content, created_at, topics, sentiment, tone, user_id,
-        users!inner ( id, username, avatar_url ), /* Ensure posts are from this user */
+        users!inner ( id, username, avatar_url ),
         likes ( user_id )
       `)
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .range(from, to);
 
-    if (error) {
-      console.error("Error fetching user posts:", error);
-    } else if (data) {
+    if (error && error.message) { 
+      console.error("Error fetching user posts:", error.message, error);
+      setHasMorePosts(false); 
+    } else if (data) { 
       const enrichedPosts = data.map(p => ({
         ...p,
         likes: { count: p.likes.length },
         liked_by_user: currentUser ? p.likes.some(like => like.user_id === currentUser.id) : false,
-        users: p.users // already fetched
+        users: p.users 
       })) as unknown as PostWithAuthor[];
 
       setPosts(prev => currentPage === 0 ? enrichedPosts : [...prev, ...enrichedPosts]);
       setHasMorePosts(data.length === POSTS_PER_PAGE);
       setPostsPage(currentPage + 1);
+    } else {
+      console.warn("No data returned and no standard error message for user posts. Error object:", error);
+      setHasMorePosts(false);
     }
     setLoadingPosts(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -134,7 +137,6 @@ export default function UserProfilePage() {
 
     if (result.success) {
         setIsFollowing(!isFollowing);
-        // Optimistically update follower count, or re-fetch profile for accuracy
         setProfile(prev => prev ? ({
             ...prev,
             followers_count: isFollowing ? prev.followers_count -1 : prev.followers_count + 1
@@ -148,7 +150,7 @@ export default function UserProfilePage() {
 
   const handlePostDeleted = (deletedPostId: string) => {
     setPosts(prevPosts => prevPosts.filter(post => post.id !== deletedPostId));
-    if (profile) { // Decrement post count
+    if (profile) { 
         setProfile(p => p ? ({...p, posts_count: Math.max(0, p.posts_count - 1) }) : null);
     }
   };
@@ -250,8 +252,6 @@ export default function UserProfilePage() {
       <Tabs defaultValue="posts" className="w-full">
         <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-3 mb-6 max-w-md mx-auto">
           <TabsTrigger value="posts">Chirps</TabsTrigger>
-          {/* <TabsTrigger value="likes">Likes</TabsTrigger> */}
-          {/* <TabsTrigger value="media">Media</TabsTrigger> */}
         </TabsList>
         <TabsContent value="posts">
           {posts.length > 0 ? (
@@ -266,6 +266,9 @@ export default function UserProfilePage() {
                   </Button>
                 </div>
               )}
+               {!hasMorePosts && posts.length > 0 && (
+                <p className="text-center text-muted-foreground py-8">You&apos;ve seen all chirps from {profile.username}.</p>
+              )}
             </div>
           ) : (
             <div className="text-center py-10 text-muted-foreground">
@@ -273,9 +276,16 @@ export default function UserProfilePage() {
               <p className="text-lg">{profile.username} hasn&apos;t chirped yet.</p>
             </div>
           )}
+           {loadingPosts && posts.length > 0 && ( // Show loader only if loading more, not initial
+            <div className="flex justify-center items-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          )}
         </TabsContent>
-        {/* Implement Likes and Media tabs if needed */}
       </Tabs>
     </div>
   );
 }
+
+
+    

@@ -1,5 +1,5 @@
 
-"use client"; // For infinite scroll and client-side data fetching
+"use client"; 
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -29,26 +29,7 @@ export default function FYPPage() {
 
     const from = currentPage * POSTS_PER_PAGE;
     const to = from + POSTS_PER_PAGE - 1;
-
-    let query = supabase
-      .from("posts")
-      .select(`
-        *,
-        users (*),
-        likes (count),
-        liked_by_user:likes!inner(user_id)
-      `)
-      .eq('likes.user_id', user?.id) // This is incorrect. liked_by_user needs to be a computed column or a separate query.
-                                  // For now, we will fetch all likes and determine client-side or simplify.
-                                  // Supabase RPC or view would be better for `liked_by_user`.
-                                  // Let's simplify: check if current user's ID is in likes array (not directly possible without modification)
-                                  // Or, fetch likes separately and map.
-                                  // For MVP, let's fetch likes count only and liked_by_user can be a follow-up.
-      .order("created_at", { ascending: false })
-      .range(from, to);
     
-    // To properly implement liked_by_user, we need to adjust the query or use an RPC.
-    // A simplified version:
     const { data, error } = await supabase
       .from('posts')
       .select(`
@@ -59,20 +40,22 @@ export default function FYPPage() {
       .order('created_at', { ascending: false })
       .range(from, to);
 
-    if (error) {
-      console.error("Error fetching posts:", error);
-      setHasMore(false); // Stop fetching on error
+    if (error && error.message) {
+      console.error("Error fetching posts on FYP:", error.message, error);
+      setHasMore(false);
     } else if (data) {
       const enrichedPosts = data.map(p => ({
         ...p,
-        likes: { count: p.likes.length }, // This is an array of likes, not a count object directly
+        likes: { count: p.likes.length }, 
         liked_by_user: user ? p.likes.some(like => like.user_id === user.id) : false,
-        // users: p.users // This is already selected
-      })) as unknown as PostWithAuthor[]; // Cast carefully
+      })) as unknown as PostWithAuthor[]; 
 
       setPosts((prevPosts) => currentPage === 0 ? enrichedPosts : [...prevPosts, ...enrichedPosts]);
       setHasMore(data.length === POSTS_PER_PAGE);
       setPage(currentPage + 1);
+    } else {
+      console.warn("No data returned and no standard error message for FYP posts. Error object:", error);
+      setHasMore(false);
     }
     setLoading(false);
     if (currentPage === 0) setInitialLoading(false);
@@ -81,23 +64,28 @@ export default function FYPPage() {
 
 
   useEffect(() => {
-    if (user) { // Only fetch if user is available
+    if (user) { 
         setInitialLoading(true);
-        setPosts([]); // Reset posts when user changes or on initial load
+        setPosts([]); 
         setPage(0);
         setHasMore(true);
         fetchPosts(0);
+    } else if (!user && !initialLoading) { // If user logs out, reset
+        setInitialLoading(true); // To show skeleton briefly or reset state
+        setPosts([]);
+        setPage(0);
+        setHasMore(true); // Allow re-fetch if user logs back in
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]); // Re-fetch when user context changes (e.g., login)
+  }, [user]); 
 
 
   useEffect(() => {
-    if (inView && hasMore && !loading && !initialLoading) {
+    if (inView && hasMore && !loading && !initialLoading && user) { // Ensure user is present
       fetchPosts(page);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inView, hasMore, loading, page, initialLoading]);
+  }, [inView, hasMore, loading, page, initialLoading, user]);
 
   const handlePostDeleted = (deletedPostId: string) => {
     setPosts(prevPosts => prevPosts.filter(post => post.id !== deletedPostId));
@@ -136,7 +124,7 @@ export default function FYPPage() {
         <div className="text-center py-10">
           <SearchX className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
           <p className="text-xl text-muted-foreground">No chirps here yet.</p>
-          <p className="text-sm text-muted-foreground">Follow some people or be the first to chirp!</p>
+          <p className="text-sm text-muted-foreground">Be the first to chirp or discover new content!</p>
         </div>
       ) : (
         <div className="space-y-6">
@@ -145,12 +133,11 @@ export default function FYPPage() {
           ))}
         </div>
       )}
-      {loading && (
+      {loading && posts.length > 0 && ( // Show loader only if loading more, not initial
         <div className="flex justify-center items-center py-8">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       )}
-      {/* Intersection observer target */}
       {hasMore && <div ref={ref} className="h-10" />} 
       {!hasMore && posts.length > 0 && (
         <p className="text-center text-muted-foreground py-8">You&apos;ve reached the end!</p>
@@ -159,9 +146,4 @@ export default function FYPPage() {
   );
 }
 
-// Note: The PostWithAuthor type might need adjustment based on actual Supabase response structure.
-// The `liked_by_user` logic is simplified here. For a robust solution, consider:
-// 1. A Supabase RPC function that joins posts with likes and checks if the current user liked each post.
-// 2. Fetching all likes for the visible posts and mapping them client-side (less performant for many posts).
-// The current approach attempts a simplified join which might not work as expected without specific Supabase setup (e.g., views or proper RLS for the join).
-// The query for likes has been simplified to fetch `likes ( user_id )` and then process it client-side.
+    
